@@ -49,3 +49,7 @@ variable "Priv_Sub_3" {
 variable "PROJECT" {
   default = "Devops-project2"
 }
+
+variable "PUBLIC_KEY_PATH" {
+  default = "id_rsa.pub"
+}
