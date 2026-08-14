@@ -2,12 +2,11 @@ pipeline {
     agent any
 
     environment {
-        AWS_DEFAULT_REGION = "ap-south-2"
-        AWS_REGION         = "ap-south-2"
+        TF_IN_AUTOMATION = 'true' // Reduces verbose output in Jenkins logs
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 checkout scm
             }
@@ -15,46 +14,59 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'],
+                    string(credentialsId: 'ssh-public-key', variable: 'TF_VAR_ssh_public_key')
+                ]) {
                     sh 'terraform init'
                 }
             }
         }
 
-        stage('Format Check') {
+        stage('Terraform Format Check') {
             steps {
-                sh 'terraform fmt -check'
+                sh 'terraform fmt -check -recursive' 
             }
         }
 
-        stage('Validate') {
+        stage('Terraform Validate') {
             steps {
                 sh 'terraform validate'
             }
         }
 
-        stage('Plan') {
+        stage('Terraform Plan') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'],
+                    string(credentialsId: 'ssh-public-key', variable: 'TF_VAR_ssh_public_key')
+                ]) {
                     sh 'terraform plan -out=tfplan'
-                    stash name: 'tfplan', includes: 'tfplan'
                 }
             }
         }
 
         stage('Manual Approval') {
             steps {
-                input message: 'Approve Terraform Apply?', ok: 'Apply'
+                input message: 'Review the Terraform plan in Jenkins logs. Proceed with Apply?', ok: 'Approve Deployment'
             }
         }
 
-        stage('Apply') {
+        stage('Terraform Apply') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
-                    unstash 'tfplan'
-                    sh 'terraform apply tfplan'
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'],
+                    string(credentialsId: 'ssh-public-key', variable: 'TF_VAR_ssh_public_key')
+                ]) {
+                    sh 'terraform apply -auto-approve tfplan'
                 }
             }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs() // Cleans up workspace to prevent state file conflicts on next run
         }
     }
 }
