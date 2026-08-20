@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_DEFAULT_REGION = "ap-south-2"
+        AWS_REGION         = "ap-south-2"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Destroy Plan') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                    sh 'terraform plan -destroy -out=destroyplan'
+                    stash name: 'destroyplan', includes: 'destroyplan'
+                }
+            }
+        }
+
+        stage('Manual Approval Gate') {
+            steps {
+                input message: '⚠️ WARNING: Are you sure you want to DESTROY all infrastructure?', ok: 'Destroy Infrastructure'
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                    unstash 'destroyplan'
+                    sh 'terraform apply destroyplan'
+                }
+            }
+        }
+    }
+}

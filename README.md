@@ -153,7 +153,8 @@ GitHub notifies Jenkins → Jenkins runs the pipeline → you approve → AWS up
 
 ## 🧹 Cleanup
 
-Tearing down is just as controlled as standing up — a separate destroy workflow with its own manual approval gate before `terraform destroy` runs.
+Tearing down is just as controlled as standing up — a separate destroy workflow ([`Jenkinsfile.destroy`](file:///c:/Users/HP/Desktop/terraform/Jenkinsfile.destroy)) with its own manual approval gate before `terraform destroy` runs.
+
 
 ---
 
