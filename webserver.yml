@@ -1,0 +1,29 @@
+---
+- name: Configure web servers
+  hosts: web02
+  become: true
+
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure Nginx service is running and enabled
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Create practice directory
+      file:
+        path: /home/ubuntu/practice
+        state: directory
+        mode: '0755'
+
+    - name: Copy index2.html to web root index.html
+      copy:
+        src: index2.html
+        dest: /var/www/html/index.html
+        mode: '0644'
